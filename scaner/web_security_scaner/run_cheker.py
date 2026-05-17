@@ -20,33 +20,20 @@ def run_scaner(host: str, port: int, user: str, passwd: str):
 
         # Выводим в консоль
         if exit_code != 0:
-            results.append({
-                'code': check.code,
-                'description': check.description,
-                'verifiable_value': check.output,
-                'status': 'ERROR',
-                'expected': check.expected,
-                'current': output.strip()
-            })
+            status = 'ERROR'
         elif check.expected == output.strip():
-            results.append({
-                'code': check.code,
-                'description': check.description,
-                'verifiable_value': check.output,
-                'status': 'PASS',
-                'expected': check.expected,
-                'current': output.strip()
-            })
+            status = 'PASS'
         else:
-            results.append({
-                'code': check.code,
-                'description': check.description,
-                'verifiable_value': check.output,
-                'status': 'FAIL',
-                'expected': check.expected,
-                'current': output.strip()
-            })
-
+            status = 'FAIL'
+        # Записываем результат
+        results.append({
+            'code': check.code,
+            'description': check.description,
+            'verifiable_value': check.output,
+            'status': status,
+            'expected': check.expected,
+            'current': output.strip()
+        })
     return results
 
 
