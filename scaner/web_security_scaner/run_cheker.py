@@ -18,7 +18,7 @@ def run_scaner(host: str, port: int, user: str, passwd: str):
     for check in main():
         output, error, exit_code = conn.execute(check.command)
 
-        # Выводим в консоль
+        # Получаем статус
         if exit_code != 0:
             status = 'ERROR'
         elif check.expected == output.strip():
