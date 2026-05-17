@@ -4,6 +4,7 @@ SSH клиент для подключения к удаленным серве�
 
 import paramiko
 
+
 class SSHConnection:
     """Класс для ssh подключения"""
 
@@ -24,12 +25,14 @@ class SSHConnection:
             self.client.connect(host, port, login, passwd)
             self.connected = True
 
+
         except paramiko.AuthenticationException:
             print("Ошибка аутентификации")
         except paramiko.SSHException as e:
             print(f"SSH ошибка: {e}")
         except Exception as e:
             print(f"Общая ошибка: {e}")
+
 
     def execute(self, command: str):
         """Метод для выполнения команд на удаленном сервере"""
@@ -49,14 +52,13 @@ class SSHConnection:
 
         return output, errors, exit_code
 
+    def get_transport(self):
+        """Получаем статус соединения"""
+        return self.client.get_transport()
+
 
     def close(self):
         """Метод закрывает соединения"""
         self.client.close()
         self.connected = False
 
-
-# test = SSHConnection()
-# test.connect('127.0.0.1', 2221, 'ansible', '!QAZxsw2')
-# print(test.execute('ls -a'))
-# test.close()
