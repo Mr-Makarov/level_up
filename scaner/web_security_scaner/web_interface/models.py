@@ -1,8 +1,8 @@
 from django.db import models
 
 # Create your models here.
-class Users(models.Model):
-    """Модель для хранения пользователей"""
+# class Users(models.Model):
+#     """Модель для хранения пользователей"""
     # username
     # email
     # password_hash
@@ -13,8 +13,8 @@ class Users(models.Model):
     # created_at
     # updated_at
 
-class Roles(models.Model):
-    """Модель для хранения ролей"""
+# class Roles(models.Model):
+#     """Модель для хранения ролей"""
     # name
     # description
     # can_scan
@@ -40,17 +40,18 @@ class Servers(models.Model):
     # updated_at
     # is_active
 
-class Profiles(models.Model):
+class ScanProfiles(models.Model):
     """"Модель для хранения профилей сканирования"""
-    # name
-    # description
-    # is_system
-    # is_base_profile
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+    is_base_profile = models.BooleanField(default=False)
     # owner_id
     # is_public
     # created_at
     # updated_at
 
+class ScanProfiles_to_Cheks(models.Model):
+    """Модель для связи профилей и проверок"""
 
 class Checks(models.Model):
     """Модель для хранения проверок безопасности"""
@@ -78,7 +79,7 @@ class Checks(models.Model):
     # Категории: 'kernel', 'ssh', 'files', 'grub', 'pam', 'services'
     parameter_check = models.CharField(max_length=255, verbose_name="Проверяемый параметр")
     command = models.CharField(max_length=255, verbose_name="Команда")
-    expected = models.CharField(max_length=255, verbose_name="Установленное значение")
+    expected = models.CharField(max_length=255, verbose_name="Установленное значение",blank=True, null=True)
     description = models.TextField(verbose_name="Описание")
     importance = models.CharField(max_length=10, verbose_name="Важность", choices=IMPORTANCE_CHOICES)
     # 'critical', 'high', 'medium', 'low'

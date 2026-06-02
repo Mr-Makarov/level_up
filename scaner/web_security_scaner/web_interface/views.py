@@ -3,10 +3,12 @@ from django.shortcuts import render
 from .forms import ConnectServerForm
 from .services import run_scan
 from .applications import test_connection
+from django.contrib.auth.decorators import login_required
 
 
 
 # Create your views here.
+@login_required
 def index(request):
     results = None
     form = ConnectServerForm()
