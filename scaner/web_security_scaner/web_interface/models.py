@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 
 # Create your models here.
 # class Users(models.Model):
@@ -45,13 +46,21 @@ class ScanProfiles(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
     is_base_profile = models.BooleanField(default=False)
-    # owner_id
-    # is_public
-    # created_at
-    # updated_at
+    created_by = models.ForeignKey(User,
+                                   on_delete=models.SET_NULL,
+                                    null=True,
+                                    blank=True,
+                                    verbose_name="Создатель")
+    created_at = models.DateTimeField(auto_now_add=True)
+    checks = models.ManyToManyField('Checks',
+                                    blank=True,
+                                    verbose_name="Проверки")
 
-class ScanProfiles_to_Cheks(models.Model):
-    """Модель для связи профилей и проверок"""
+    def __str__(self):
+        return self.name
+
+
+
 
 class Checks(models.Model):
     """Модель для хранения проверок безопасности"""
