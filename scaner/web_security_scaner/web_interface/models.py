@@ -28,18 +28,28 @@ from django.contrib.auth.models import User
 
 class Servers(models.Model):
     """Модель хранит данные о сканируемых серверах"""
-    # name
-    # host
-    # port
-    # username
-    # auth_type
-    # credential_encrypted
-    # os_type
-    # last_scan_at
-    # created_by
-    # created_at
-    # updated_at
-    # is_active
+    name = models.CharField(max_length=255, verbose_name="Имя", null=True, blank=True)
+    host = models.CharField(max_length=255, verbose_name="IP-адрес", null=True, blank=True)
+    port = models.IntegerField(default=22, verbose_name="Порт")
+    username = models.CharField(max_length=25, verbose_name="Пользователь", null=True, blank=True)
+    password = models.CharField(max_length=255, verbose_name="Пароль", null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True, verbose_name="Активен")
+    # Связь с пользователем, кто добавил
+    created_by = models.ForeignKey(User,
+                                    on_delete=models.SET_NULL,
+                                    null=True,
+                                    blank=True,
+                                    verbose_name="Кто добавил"
+                                )
+
+    def __str__(self):
+        return f"{self.name} ({self.host}:{self.port})"
+
+    class Meta:
+        verbose_name = "Сервер"
+        verbose_name_plural = "Серверы"
 
 class ScanProfiles(models.Model):
     """"Модель для хранения профилей сканирования"""

@@ -5,7 +5,7 @@ from core.ssh_client import SSHConnection
 from core.checker import get_checks_from_db
 
 
-def run_scaner(host: str, port: int, user: str, passwd: str):
+def run_scaner(host: str, port: int, user: str, passwd: str, checks):
     """Функция запуска сканирования"""
 
     results = []
@@ -15,7 +15,7 @@ def run_scaner(host: str, port: int, user: str, passwd: str):
     conn.connect(host, port, user, passwd)
 
     # Проверяем
-    for check in get_checks_from_db():
+    for check in checks:
         output, error, exit_code = conn.execute(check.command)
 
         # Получаем статус
