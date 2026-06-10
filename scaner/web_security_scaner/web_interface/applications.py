@@ -9,20 +9,15 @@ def test_connection(host, port, username, password):
     conn = SSHConnection()
     try:
         conn.connect(host, port, username, password)
-        # Проверяем соединение
-        transport = conn.get_transport()
-
-        if transport is not None and transport.is_active():
-            return {
-            'type': 'check',
-            'data': f"✅ Успешное подключение к {username}@{host}:{port}"
-            }
+        if conn.connected:
+            output, error, code = conn.execute('echo OK')
+            if code == 0 and 'OK' in output:
+                return True, f"✅ Успешное подключение к {username}@{host}:{port}"
+            else:
+                return False, f"⚠️ Команда не выполняется: {error}"
         else:
-            return {
-            'type': 'check',
-            'data': f"❌ Ошибка подключения: {str(e)}"
-            }
+            return False, f"❌ Не удалось подключиться"
     except Exception as e:
-        return f"Ошибка: {e}"
+        return False, f"❌ Ошибка: {str(e)}"
     finally:
         conn.close()

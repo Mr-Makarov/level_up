@@ -1,4 +1,4 @@
-import csv
+import csv, json
 from django.shortcuts import render, redirect
 #from django.http import HttpResponse
 from .forms import ConnectServerForm, ServerAddForm
@@ -7,6 +7,7 @@ from .applications import test_connection
 from django.contrib.auth.decorators import login_required
 from .models import ScanProfiles, Servers
 from django.contrib import messages
+from django.http import JsonResponse
 
 
 
@@ -18,6 +19,22 @@ def index(request):
 
     profiles = ScanProfiles.objects.all()
     form.fields['check'].choices = [(r.id, r.name) for r in profiles]
+
+    # Заполнение формы если передан GET  pfghjc
+    server_id = request.GET.get('server_id')
+    if server_id:
+        try:
+            server = Servers.objects.get(id=server_id, created_by=request.user)
+            initial = {
+                'host': server.host,
+                'port': server.port,
+                'username': server.username,
+                'password': server.password,
+            }
+            form = ConnectServerForm(initial=initial)
+            form.fields['check'].choices = [(p.id, p.name) for p in profiles]
+        except Servers.DoesNotExist:
+            pass
 
     if request.method == 'POST':
 
@@ -54,6 +71,7 @@ def index(request):
 @login_required
 def servers_list(request):
     """Представление для списка серверов"""
+
     servers = Servers.objects.filter(is_active=True)  # пока без фильтра по пользователю
     return render(request, 'web_interface/servers_list.html', {'servers': servers})
 
@@ -84,6 +102,8 @@ def server_add(request):
 
 @login_required
 def servers_import(request):
+    """Представление для массового добавления серверов"""
+
     if request.method == 'POST' and request.FILES.get('csv_file'):
         csv_file = request.FILES['csv_file']
         # Проверяем расширение
@@ -126,5 +146,20 @@ def servers_import(request):
     return redirect('servers_list')
 
 
+@login_required
+def check_connection_ajax(request):
+    """Представление проверки соединения для группы серверов"""
 
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            host = data.get('host')
+            port = data.get('port')
+            username = data.get('username')
+            password = data.get('password')
+            success, message = test_connection(host, port, username, password)
+            return JsonResponse({'success': success, 'message': message})
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)}, status=400)
+    return JsonResponse({'success': False, 'message': 'Invalid request'}, status=405)
 

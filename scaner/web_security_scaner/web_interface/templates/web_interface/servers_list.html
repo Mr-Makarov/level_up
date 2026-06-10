@@ -40,8 +40,8 @@
             <td>{{ server.username }}</td>
             <td>{{ server.is_active|yesno:"Да,Нет" }}</td>
             <td>
-                <button>Проверить соединение</button>
-                <button>Сканировать</button>
+                <button class="check-conn-btn" data-host="{{ server.host }}" data-port="{{ server.port }}" data-username="{{ server.username }}" data-password="{{ server.password }}">Проверить соединение</button>
+                <button onclick="location.href='{% url 'index' %}?server_id={{ server.id }}'">Сканировать</button>
             </td>
         </tr>
         {% empty %}
@@ -53,4 +53,71 @@
 </table>
 
 <a href="{% url 'index' %}">← На главную</a>
+
+<script>
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+document.querySelectorAll('.check-conn-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        const button = this;  // сохраняем ссылку на кнопку
+        const host = button.dataset.host;
+        const port = button.dataset.port;
+        const username = button.dataset.username;
+        const password = button.dataset.password;
+
+        // Меняем текст кнопки на время проверки
+        const originalText = button.innerHTML;
+        button.innerHTML = '⏳ Проверка...';
+
+        fetch("{% url 'check_connection_ajax' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                host: host,
+                port: port,
+                username: username,
+                password: password
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                button.innerHTML = '✅ Соединение установлено';
+            } else {
+                button.innerHTML = '❌ Ошибка';
+                // можно вывести подробности в консоль, но не alert
+                console.error(data.message);
+            }
+            setTimeout(() => {
+                button.innerHTML = originalText;
+            }, 3000);
+        })
+        .catch(err => {
+            button.innerHTML = '❌ Ошибка сети';
+            setTimeout(() => {
+                button.innerHTML = originalText;
+            }, 3000);
+        });
+    });
+});
+</script>
+
 {% endblock %}
+
