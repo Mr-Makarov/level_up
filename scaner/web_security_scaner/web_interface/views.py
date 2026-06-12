@@ -1,14 +1,12 @@
 import csv, json
 from django.shortcuts import render, redirect
-#from django.http import HttpResponse
 from .forms import ConnectServerForm, ServerAddForm
 from .services import run_scan
-from .applications import test_connection
+from applications import test_connection
 from django.contrib.auth.decorators import login_required
-from .models import ScanProfiles, Servers
+from .models import ScanProfiles, Servers, ServerStatus
 from django.contrib import messages
 from django.http import JsonResponse
-
 
 
 # Create your views here.
@@ -70,9 +68,20 @@ def index(request):
 
 @login_required
 def servers_list(request):
-    """Представление для списка серверов"""
-
-    servers = Servers.objects.filter(is_active=True)  # пока без фильтра по пользователю
+    servers = Servers.objects.filter(is_active=True)
+    for server in servers:
+        try:
+            status_obj = ServerStatus.objects.get(server=server)
+            if status_obj.status == 'ok':
+                server.status_icon = '✅'
+                server.status_text = 'Соединение установлено'
+            else:
+                server.status_icon = '❌'
+                server.status_text = 'Не удалось подключиться'
+            server.status_tooltip = status_obj.message
+        except ServerStatus.DoesNotExist:
+            server.status_icon = '❓'
+            server.status_tooltip = 'Не проверялось'
     return render(request, 'web_interface/servers_list.html', {'servers': servers})
 
 
@@ -163,3 +172,23 @@ def check_connection_ajax(request):
             return JsonResponse({'success': False, 'message': str(e)}, status=400)
     return JsonResponse({'success': False, 'message': 'Invalid request'}, status=405)
 
+
+@login_required
+def update_server_status(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            server_id = data.get('server_id')
+            success = data.get('success')
+            message = data.get('message', '')
+            server = Servers.objects.get(id=server_id, created_by=request.user)
+            status_obj, created = ServerStatus.objects.get_or_create(server=server)
+            status_obj.status = 'ok' if success else 'error'
+            status_obj.message = message
+            status_obj.save()
+            return JsonResponse({'success': True})
+        except Servers.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Server not found'}, status=404)
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    return JsonResponse({'success': False, 'error': 'Invalid request'}, status=405)

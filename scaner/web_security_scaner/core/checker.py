@@ -22,7 +22,6 @@ def get_checks_from_db():
 
         queryset = Checks.objects.all()
 
-        # Преобразуем в список объектов класса Check
         checks = []
         for db_check in queryset:
             check = Check(

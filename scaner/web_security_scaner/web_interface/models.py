@@ -51,6 +51,19 @@ class Servers(models.Model):
         verbose_name = "Сервер"
         verbose_name_plural = "Серверы"
 
+
+
+class ServerStatus(models.Model):
+    """Модель для хранения статусов серверов"""
+    server = models.OneToOneField(Servers, on_delete=models.CASCADE)
+    last_check = models.DateTimeField(auto_now=True)
+    status = models.CharField(max_length=20, default='unknown')
+    message = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.server.name}: {self.status}"
+
+
 class ScanProfiles(models.Model):
     """"Модель для хранения профилей сканирования"""
     name = models.CharField(max_length=100, unique=True)
@@ -68,7 +81,6 @@ class ScanProfiles(models.Model):
 
     def __str__(self):
         return self.name
-
 
 
 
@@ -106,6 +118,8 @@ class Checks(models.Model):
     def __str__(self):
         return f"{self.code} {self.category} {self.parameter_check} - {self.description[:50]}"
 
+
+
 class ScanSessions(models.Model):
     """Модель для хранения информации о сессиях сканирования"""
     # server_id
@@ -118,6 +132,7 @@ class ScanSessions(models.Model):
     # passed_count
     # failed_count
     # error_count
+
 
 
 class ScanResults(models.Model):
