@@ -25,7 +25,6 @@ class SSHConnection:
             self.client.connect(host, port, login, passwd)
             self.connected = True
 
-
         except paramiko.AuthenticationException:
             print("Ошибка аутентификации")
         except paramiko.SSHException as e:

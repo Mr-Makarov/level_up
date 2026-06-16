@@ -18,6 +18,15 @@
     <div id="results">
 {% if results %}
     {% if results.type == 'scan' %}
+
+        {% if selected_server %}
+        <div style="margin-top: 20px;">
+            <a href="{% url 'export_server_report_csv' server_id=selected_server.id %}" class="btn">
+                📥 Скачать отчет по серверу (CSV)
+            </a>
+        </div>
+        {% endif %}
+
         <h3>Результаты сканирования:</h3>
 
         <!-- Статистика -->
@@ -67,6 +76,7 @@
                 {% endfor %}
             </tbody>
         </table>
+
     {% elif results.type == 'check' %}
         <h3>Результат проверки соединения:</h3>
         <pre>{{ results.data }}</pre>

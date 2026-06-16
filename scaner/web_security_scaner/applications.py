@@ -9,10 +9,15 @@ def test_connection(host, port, username, password):
     try:
         conn.connect(host, port, username, password)
         if conn.connected:
-            return {'type': 'check', 'data': f"✅ Успешное подключение к {username}@{host}:{port}"}
+            # Проверяем, можем ли выполнить команду
+            output, error, code = conn.execute('echo OK')
+            if code == 0 and 'OK' in output:
+                return True, f"✅ Успешное подключение к {username}@{host}:{port}"
+            else:
+                return False, f"⚠️ Подключено, но команда не выполняется: {error}"
         else:
-            return {'type': 'check', 'data': f"❌ Не удалось подключиться"}
+            return False, f"❌ Не удалось подключиться"
     except Exception as e:
-        return {'type': 'check', 'data': f"❌ Ошибка: {str(e)}"}
+        return False, f"❌ Ошибка: {str(e)}"
     finally:
         conn.close()

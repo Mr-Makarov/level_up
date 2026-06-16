@@ -3,7 +3,7 @@ from django.shortcuts import render, redirect
 from .forms import ConnectServerForm, ServerAddForm
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from .models import ScanProfiles, Servers, ServerStatus
@@ -101,7 +101,8 @@ def index(request):
 
     return render(request, 'web_interface/index.html', {
         'form': form,
-        'results': results_data
+        'results': results_data,
+        'selected_server': selected_server
     })
 
 
@@ -316,3 +317,33 @@ def scan_server(request, server_id):
         'results': scan_data.get('data', []),
         'stats': server.last_scan_summary,
     })
+
+@login_required
+def export_server_report_csv(request, server_id):
+    """Представление для экспорта данных о сканирование в CSV"""
+    server = get_object_or_404(Servers, id=server_id, created_by=request.user)
+
+    if not server.last_scan_details:
+        response = HttpResponse(content_type='text/plain; charset=utf-8-sig')
+        response.write('Нет данных сканирования для этого сервера.')
+        return response
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+    response['Content-Disposition'] = f'attachment; filename="server_{server.name}_scan_report.csv"'
+
+    writer = csv.writer(response, delimiter=';')
+    writer.writerow(['Код','Описание','Проверяемый параметр','Статус','Ожидалось','Получено'])
+
+    for item in server.last_scan_details:
+        if item.get('status') == 'ERROR':
+            current_value = item.get('message','Ошибка')
+        else:
+            current_value = item.get('current', '')
+        writer.writerow([
+            item.get('code',''),
+            item.get('description', ''),
+            item.get('verifiable_value', ''),
+            item.get('status', ''),
+            item.get('expected', ''),
+        ])
+    return response
