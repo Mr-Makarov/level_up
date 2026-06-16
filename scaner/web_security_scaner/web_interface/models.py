@@ -1,30 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
 
-# Create your models here.
-# class Users(models.Model):
-#     """Модель для хранения пользователей"""
-    # username
-    # email
-    # password_hash
-    # full_name
-    # role_id
-    # is_active
-    # last_login
-    # created_at
-    # updated_at
-
-# class Roles(models.Model):
-#     """Модель для хранения ролей"""
-    # name
-    # description
-    # can_scan
-    # can_create_profiles
-    # can_manage_servers
-    # can_manage_users
-    # can_view_all_results
-    # created_at
-
 
 class Servers(models.Model):
     """Модель хранит данные о сканируемых серверах"""
@@ -43,6 +19,12 @@ class Servers(models.Model):
                                     blank=True,
                                     verbose_name="Кто добавил"
                                 )
+    # Результаты сканирования
+    last_scan_date = models.DateTimeField(null=True, blank=True)
+    last_scan_status = models.CharField(max_length=20, null=True, blank=True)
+    last_scan_summary = models.JSONField(default=dict, blank=True)
+    last_scan_details = models.JSONField(default=list, blank=True)
+
 
     def __str__(self):
         return f"{self.name} ({self.host}:{self.port})"
@@ -64,10 +46,12 @@ class ServerStatus(models.Model):
         return f"{self.server.name}: {self.status}"
 
 
+
 class ScanProfiles(models.Model):
     """"Модель для хранения профилей сканирования"""
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
     is_base_profile = models.BooleanField(default=False)
     created_by = models.ForeignKey(User,
                                    on_delete=models.SET_NULL,
@@ -119,29 +103,3 @@ class Checks(models.Model):
         return f"{self.code} {self.category} {self.parameter_check} - {self.description[:50]}"
 
 
-
-class ScanSessions(models.Model):
-    """Модель для хранения информации о сессиях сканирования"""
-    # server_id
-    # profile_id
-    # triggered_by
-    # status
-    # started_at
-    # finished_at
-    # total_checks
-    # passed_count
-    # failed_count
-    # error_count
-
-
-
-class ScanResults(models.Model):
-    """Модель для хранения результатов сканирования"""
-    # session_id
-    # check_category
-    # check_id
-    # result
-    # current_value
-    # expected_value_used
-    # error_message
-    # checked_at

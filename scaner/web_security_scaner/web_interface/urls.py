@@ -10,4 +10,5 @@ urlpatterns = [
     path('servers/import/', views.servers_import, name='servers_import'),
     path('check-connection/', views.check_connection_ajax, name='check_connection_ajax'),
     path('update-server-status/', views.update_server_status, name='update_server_status'),
+    path('mass-scan-sync/', views.mass_scan_sync, name='mass_scan_sync'),
 ]

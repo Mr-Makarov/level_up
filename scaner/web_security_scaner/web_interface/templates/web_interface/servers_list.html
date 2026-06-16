@@ -20,9 +20,20 @@
     <button type="submit">Загрузить и импортировать</button>
 </form>
 
+
 <button id="mass-check-btn" style="margin: 10px 0;">Проверить соединение выбранных</button>
 <div id="mass-check-progress" style="margin-bottom: 10px;"></div>
 
+<div style="margin: 10px 0;">
+    <label for="profile-select">Профиль сканирования:</label>
+    <select id="profile-select">
+        {% for profile in profiles %}
+        <option value="{{ profile.id }}">{{ profile.name }}</option>
+        {% endfor %}
+    </select>
+    <button id="mass-scan-sync-btn">Сканировать выбранные</button>
+    <div id="sync-scan-progress"></div>
+</div>
 
 <table border="1" style="width:100%; border-collapse: collapse;">
     <thead>
@@ -35,6 +46,7 @@
             <th>Активен</th>
             <th>Действия</th>
             <th>Статус</th>
+            <th>Последнее сканирование</th>
         </tr>
     </thead>
     <tbody>
@@ -48,12 +60,18 @@
             <td>{{ server.is_active|yesno:"Да,Нет" }}</td>
             <td>
                 <button class="check-conn-btn" data-server-id="{{ server.id }}" data-host="{{ server.host }}" data-port="{{ server.port }}" data-username="{{ server.username }}" data-password="{{ server.password }}">Проверить соединение</button>
-                <button onclick="location.href='{% url 'index' %}?server-id={{ server.id }}'">Сканировать</button>
+                <button onclick="location.href='{% url 'index' %}?server_id={{ server.id }}'">Сканировать</button>
             </td>
            <td class="status-cell-{{ server.id }}">
                 <span title="{{ server.status_tooltip }}">{{ server.status_icon }}</span>
                 <span class="status-text-{{ server.id }}">{{ server.status_text }}</span>
            </td>
+            <td>
+                {% if server.last_scan_status == 'success' %}✅ {{ server.last_scan_date|date:"d.m.Y H:i" }}
+                {% elif server.last_scan_status == 'failed' %}❌ {{ server.last_scan_date|date:"d.m.Y H:i" }}
+                {% elif server.last_scan_status == 'error' %}⚠️ {{ server.last_scan_date|date:"d.m.Y H:i" }}
+                {% else %}❓ не проводилось{% endif %}
+            </td>
 
         </tr>
         {% empty %}
@@ -237,6 +255,64 @@ document.querySelectorAll('.check-conn-btn').forEach(btn => {
                 button.innerHTML = originalText;
             }, 3000);
         });
+    });
+});
+    // Обработчик для кнопки "Сканировать выбранные"
+document.getElementById('mass-scan-sync-btn').addEventListener('click', function() {
+    const checkboxes = document.querySelectorAll('.server-checkbox:checked');
+    const serverIds = Array.from(checkboxes).map(cb => cb.value);
+    if (serverIds.length === 0) {
+        alert('Выберите хотя бы один сервер');
+        return;
+    }
+    const profileId = document.getElementById('profile-select').value;
+    const btn = this;
+    const progressDiv = document.getElementById('sync-scan-progress');
+
+    btn.disabled = true;
+    btn.innerHTML = 'Сканирование...';
+    progressDiv.innerHTML = '⏳ Сканирование запущено. Пожалуйста, подождите, это может занять время...';
+
+    fetch("{% url 'mass_scan_sync' %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({ server_ids: serverIds, profile_id: profileId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            let message = `✅ Сканирование завершено!\n`;
+            message += `Всего серверов: ${data.summary.total}\n`;
+            message += `✅ PASS: ${data.summary.passed_total}\n`;
+            message += `❌ FAIL: ${data.summary.failed_total}\n`;
+            message += `⚠️ ERROR: ${data.summary.error_total}\n\n`;
+            message += `Детали:\n`;
+            data.details.forEach(d => {
+                if (d.status === 'success') {
+                    message += ` - ${d.server_name}: ✅ успешно (PASS=${d.stats.PASS}, FAIL=${d.stats.FAIL})\n`;
+                } else if (d.status === 'failed') {
+                    message += ` - ${d.server_name}: ❌ провал (PASS=${d.stats.PASS}, FAIL=${d.stats.FAIL})\n`;
+                } else {
+                    message += ` - ${d.server_name}: ⚠️ ошибка (${d.error})\n`;
+                }
+            });
+            alert(message);
+            location.reload(); // перезагружаем страницу, чтобы обновить статусы
+        } else {
+            alert('Ошибка: ' + data.error);
+        }
+    })
+    .catch(err => {
+        alert('Ошибка сети');
+        console.error(err);
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = 'Сканировать выбранные (синхронно)';
+        progressDiv.innerHTML = '';
     });
 });
 </script>

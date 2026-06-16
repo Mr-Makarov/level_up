@@ -1,36 +1,47 @@
 import csv, json
 from django.shortcuts import render, redirect
 from .forms import ConnectServerForm, ServerAddForm
-from .services import run_scan
-from applications import test_connection
 from django.contrib.auth.decorators import login_required
-from .models import ScanProfiles, Servers, ServerStatus
 from django.contrib import messages
 from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from .models import ScanProfiles, Servers, ServerStatus
+from .services import run_scan, scan_and_save
+from applications import test_connection
 
 
 # Create your views here.
 @login_required
 def index(request):
-    results = None
+    results_data = None
     form = ConnectServerForm()
 
     profiles = ScanProfiles.objects.all()
     form.fields['check'].choices = [(r.id, r.name) for r in profiles]
 
-    # Заполнение формы если передан GET  pfghjc
+    # Заполнение формы если передан GET
+    selected_server = None
     server_id = request.GET.get('server_id')
     if server_id:
         try:
-            server = Servers.objects.get(id=server_id, created_by=request.user)
+            selected_server = Servers.objects.get(id=server_id, created_by=request.user)
             initial = {
-                'host': server.host,
-                'port': server.port,
-                'username': server.username,
-                'password': server.password,
+                'host': selected_server.host,
+                'port': selected_server.port,
+                'username': selected_server.username,
+                'password': selected_server.password,
             }
             form = ConnectServerForm(initial=initial)
             form.fields['check'].choices = [(p.id, p.name) for p in profiles]
+            # Если есть сохранённые результаты, показываем их
+            if selected_server.last_scan_details:
+                results_data = {
+                    'type': 'scan',
+                    'data': selected_server.last_scan_details,
+                    'stats': selected_server.last_scan_summary,
+                    'server_name': selected_server.name,
+                }
         except Servers.DoesNotExist:
             pass
 
@@ -52,23 +63,52 @@ def index(request):
             action = request.POST.get('action')
 
             if action == 'check':
-                results = test_connection(host, port, username, password)
+                results_data = test_connection(host, port, username, password)
+                print(results_data)
             elif action == 'scan':
-                results = run_scan(host, port, username, password, checks)
+                try:
+                    server = Servers.objects.get(host=host, port=port, username=username, created_by=request.user)
+                except Servers.DoesNotExist:
+                    server = None
+                scan_result = run_scan(host, port, username, password, checks)
+                if server:
+                    # Сохраняем результат в сервер
+                    stats = scan_result.get('stats', {})
+                    server.last_scan_date = timezone.now()
+                    if stats.get('FAIL', 0) > 0:
+                        server.last_scan_status = 'failed'
+                    elif stats.get('ERROR', 0) > 0:
+                        server.last_scan_status = 'error'
+                    else:
+                        server.last_scan_status = 'success'
+                    server.last_scan_summary = stats
+                    server.last_scan_details = scan_result.get('data', [])
+                    server.save(
+                        update_fields=['last_scan_date', 'last_scan_status', 'last_scan_summary', 'last_scan_details'])
+                    results_data = {
+                        'type': 'scan',
+                        'data': scan_result.get('data'),
+                        'stats': stats,
+                        'server_name': server.name,
+                    }
+                else:
+                    # Если сервер не найден в базе, просто показываем результат без сохранения
+                    results_data = scan_result
             else:
-                results = f"❌ Неизвестное действие: {action}"
+                results_data  = f"❌ Неизвестное действие: {action}"
         else:
-            results = f"❌ Ошибка в форме: {form.errors}"
+            results_data  = f"❌ Ошибка в форме: {form.errors}"
 
     return render(request, 'web_interface/index.html', {
         'form': form,
-        'results': results
+        'results': results_data
     })
 
 
 @login_required
 def servers_list(request):
     servers = Servers.objects.filter(is_active=True)
+    profiles = ScanProfiles.objects.filter(is_active=True)
     for server in servers:
         try:
             status_obj = ServerStatus.objects.get(server=server)
@@ -82,7 +122,7 @@ def servers_list(request):
         except ServerStatus.DoesNotExist:
             server.status_icon = '❓'
             server.status_tooltip = 'Не проверялось'
-    return render(request, 'web_interface/servers_list.html', {'servers': servers})
+    return render(request, 'web_interface/servers_list.html', {'servers': servers, 'profiles': profiles})
 
 
 @login_required
@@ -175,6 +215,7 @@ def check_connection_ajax(request):
 
 @login_required
 def update_server_status(request):
+    """"Представление для обновления статусов серверов после проверки соединения"""
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
@@ -192,3 +233,86 @@ def update_server_status(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
     return JsonResponse({'success': False, 'error': 'Invalid request'}, status=405)
+
+
+@login_required
+def mass_scan_sync(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        server_ids = data.get('server_ids', [])
+        profile_id = data.get('profile_id')
+
+        if not server_ids or not profile_id:
+            return JsonResponse({'error': 'Missing parameters'}, status=400)
+
+        profile = ScanProfiles.objects.get(id=profile_id, is_active=True)
+        servers = Servers.objects.filter(id__in=server_ids, is_active=True)
+        if not servers.exists():
+            return JsonResponse({'error': 'No valid servers'}, status=400)
+
+        passed_total = 0
+        failed_total = 0
+        error_total = 0
+        results_list = []  # для быстрого ответа (или можно потом загрузить из БД)
+
+        # Последовательно сканируем каждый сервер
+        for server in servers:
+            checks = profile.checks.all()
+            try:
+                scan_result = run_scan(server.host, server.port, server.username, server.password, checks)
+                stats = scan_result.get('stats', {'PASS': 0, 'FAIL': 0, 'ERROR': 0})
+                passed_total += stats['PASS']
+                failed_total += stats['FAIL']
+                error_total += stats['ERROR']
+
+                # Сохраняем
+                scan_and_save(server, profile)
+
+                results_list.append({
+                    'server_name': server.name,
+                    'status': 'success' if stats['FAIL'] == 0 else 'failed',
+                    'stats': stats
+                })
+            except Exception as e:
+                error_total += 1
+                results_list.append({
+                    'server_name': server.name,
+                    'status': 'error',
+                    'error': str(e)
+                })
+
+        # Возвращаем сводку
+        return JsonResponse({
+            'success': True,
+            'summary': {
+                'total': servers.count(),
+                'passed_total': passed_total,
+                'failed_total': failed_total,
+                'error_total': error_total
+            },
+            'details': results_list
+        })
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+def scan_server(request, server_id):
+    server = get_object_or_404(Servers, id=server_id, created_by=request.user)
+    # Получаем профиль (например, последний использованный или базовый)
+    # Можно передавать profile_id через GET, но пока возьмём первый активный
+    profile = ScanProfiles.objects.filter(is_base_profile=True).first()
+    if not profile:
+        profile = ScanProfiles.objects.first()
+    # Сканируем
+    scan_data = scan_and_save(server, profile)
+    # Отображаем страницу с результатами
+    return render(request, 'web_interface/server_scan_result.html', {
+        'server': server,
+        'results': scan_data.get('data', []),
+        'stats': server.last_scan_summary,
+    })

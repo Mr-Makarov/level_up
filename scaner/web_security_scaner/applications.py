@@ -5,19 +5,14 @@ def test_connection(host, port, username, password):
     """
     Проверка SSH подключения
     """
-
     conn = SSHConnection()
     try:
         conn.connect(host, port, username, password)
         if conn.connected:
-            output, error, code = conn.execute('echo OK')
-            if code == 0 and 'OK' in output:
-                return True, f"✅ Успешное подключение к {username}@{host}:{port}"
-            else:
-                return False, f"⚠️ Команда не выполняется: {error}"
+            return {'type': 'check', 'data': f"✅ Успешное подключение к {username}@{host}:{port}"}
         else:
-            return False, f"❌ Не удалось подключиться"
+            return {'type': 'check', 'data': f"❌ Не удалось подключиться"}
     except Exception as e:
-        return False, f"❌ Ошибка: {str(e)}"
+        return {'type': 'check', 'data': f"❌ Ошибка: {str(e)}"}
     finally:
         conn.close()
